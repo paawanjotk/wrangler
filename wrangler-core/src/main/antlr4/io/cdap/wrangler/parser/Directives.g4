@@ -64,6 +64,8 @@ directive
     | stringList
     | numberRanges
     | properties
+    | byteSize
+    | timeDuration
   )*?
   ;
 
@@ -114,6 +116,14 @@ codeblock
 identifier
  : Identifier
  ;
+
+byteSize
+  : BYTE_SIZE
+  ;
+
+timeDuration
+  : TIME_DURATION
+  ;
 
 properties
  : 'prop' ':' OBrace (propertyList)+  CBrace
@@ -311,3 +321,19 @@ fragment Int
 fragment Digit
  : [0-9]
  ;
+
+BYTE_SIZE
+  : Int ('.' Digit*)? BYTE_UNIT
+  ;
+
+TIME_DURATION
+  : Int ('.' Digit*)?  TIME_UNIT
+  ;
+
+fragment BYTE_UNIT
+  : [KMGTP] 'B'   // KB, MB, GB, TB, PB
+  ;
+
+fragment TIME_UNIT
+  : 'ms' | 's' | 'm' | 'h' | 'd' // milliseconds, seconds, minutes, hours, days
+  ;

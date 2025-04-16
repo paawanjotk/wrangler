@@ -16,14 +16,24 @@
 
 package io.cdap.wrangler.parser;
 
+import io.cdap.wrangler.TestingPipelineContext;
 import io.cdap.wrangler.TestingRig;
 import io.cdap.wrangler.api.CompileStatus;
 import io.cdap.wrangler.api.Compiler;
 import io.cdap.wrangler.api.Directive;
+import io.cdap.wrangler.api.ExecutorContext;
 import io.cdap.wrangler.api.RecipeParser;
+import io.cdap.wrangler.api.Row;
+import io.cdap.wrangler.api.TransientStore;
+import io.cdap.wrangler.api.parser.ByteSize;
+import io.cdap.wrangler.api.parser.TimeDuration;
+import io.cdap.wrangler.utils.InMemoryTransientStore;
+
 import org.junit.Assert;
 import org.junit.Test;
 
+
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -75,4 +85,43 @@ public class GrammarBasedParserTest {
     Assert.assertEquals(0, directives.size());
   }
 
+  @Test
+  public void testAggregateStatsDirectiveParsing() throws Exception {
+    String[] recipe = new String[] {
+      "#pragma load-directives aggregate-stats;",
+      "aggregate-stats :data_transfer_size :response_time :total_size_mb :total_time_sec 'MB' 's' 'true' 'true';"
+    };
+
+    RecipeParser parser = TestingRig.parse(recipe);
+    List<Directive> directives = parser.parse();
+
+    Assert.assertEquals(1, directives.size());
+    Assert.assertTrue(directives.get(0) instanceof io.cdap.directives.aggregates.AggregateStats);
+  }
+
+  @Test
+  public void testAggregateStatsTotal() throws Exception {
+      String[] recipe = new String[] {
+          "#pragma load-directives aggregate-stats;",
+          "aggregate-stats :sizeColumn :timeColumn :totalSizeColumn :totalTimeColumn 'MB' 's' 'false' 'true';"
+      };
+  
+      Row row1 = new Row("sizeColumn", new ByteSize("3MB")).add("timeColumn", new TimeDuration("2s"));
+      Row row2 = new Row("sizeColumn", new ByteSize("2MB")).add("timeColumn", new TimeDuration("3s"));
+  
+      TransientStore store = new InMemoryTransientStore();
+      ExecutorContext context = new TestingPipelineContext() {
+          @Override
+          public TransientStore getTransientStore() {
+              return store;
+          }
+      };
+  
+      List<Row> results = TestingRig.execute(recipe, Arrays.asList(row1, row2), context);
+      Row row = results.get(results.size() - 1);
+      //Assert.assertEquals(1, results.size());
+      Row result = row;
+      Assert.assertEquals(5.0, (Double) result.getValue("totalSizeColumn"), 0.001);
+      Assert.assertEquals(5.0, (Double) result.getValue("totalTimeColumn"), 0.001);
+  }
 }
